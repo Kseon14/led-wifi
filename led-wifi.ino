@@ -26,7 +26,7 @@ CRGBArray<NUM_LEDS> leds;
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
 
 char* ssid = "KS6";  //  your network SSID (name)
-char* pass = "Rom654321";       // your network password
+char* pass = "*****;       // your network password
 
 int bluePin = 14;
 int redPin = 12;
@@ -340,7 +340,6 @@ void setup() {
   Alarm.alarmRepeat(alarms[1], 00, 0, setSunset);
   Alarm.alarmRepeat(alarms[2], 00, 0, setTwilight);
   Alarm.alarmRepeat(alarms[3], 00, 0, setLedOff);
-  //setLedPinWithLevel();
 }
 
 void loop() {
