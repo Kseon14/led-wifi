@@ -1,7 +1,9 @@
 #define FASTLED_ESP8266_RAW_PIN_ORDER
 #define FASTLED_ESP8266_NODEMCU_PIN_ORDER
-#define FASTLED_FORCE_SOFTWARE_SPI#include <stdio.h>
-#include "TimeAlarms.h"
+#define FASTLED_FORCE_SOFTWARE_SPI
+#include <stdio.h>
+#include <TimeLib.h>
+#include <TimeAlarms.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include <FastLED.h>
