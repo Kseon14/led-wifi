@@ -282,18 +282,18 @@ void printLed() {
 void checkLedsChannels() {
   leds = CRGB(0, 0, 255);  
   FastLED.show();
-  printText("Checkig blue...");
-  Serial.println("Checkig blue...");
+  printText("Checking blue...");
+  Serial.println("Checking blue...");
   delay(1000);
   leds = CRGB(255, 0, 0);  
   FastLED.show();
-  printText("Checkig red...");
-  Serial.println("Checkig red...");
+  printText("Checking red...");
+  Serial.println("Checking red...");
   delay(1000);
   leds = CRGB(0, 255, 0);  
   FastLED.show();
-  printText("Checkig green...");
-  Serial.println("Checkig green...");
+  printText("Checking green...");
+  Serial.println("Checking green...");
   delay(1000);
 }
 
@@ -340,7 +340,7 @@ void setup() {
   Alarm.alarmRepeat(alarms[1], 00, 0, setSunset);
   Alarm.alarmRepeat(alarms[2], 00, 0, setTwilight);
   Alarm.alarmRepeat(alarms[3], 00, 0, setLedOff);
-  setLedPinWithLevel();
+  //setLedPinWithLevel();
 }
 
 void loop() {
