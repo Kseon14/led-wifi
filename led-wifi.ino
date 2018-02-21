@@ -26,7 +26,7 @@ CRGBArray<NUM_LEDS> leds;
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
 
 char* ssid = "KS6";  //  your network SSID (name)
-char* pass = "*****";       // your network password
+char* pass = "Rom654321";       // your network password
 
 int bluePin = 14;
 int redPin = 12;
@@ -59,7 +59,7 @@ unsigned long sendNTPpacket(IPAddress& address) {
   // (see URL above for details on the packets)
   packetBuffer[0] = 0b11100011;   // LI, Version, Mode
   packetBuffer[1] = 0;     // Stratum, or type of clock
-  packetBuffer[2] = 6;     // Polling Interval
+  packetBuffer[2]= 6;     // Polling Interval
   packetBuffer[3] = 0xEC;  // Peer Clock Precision
   // 8 bytes of zero for Root Delay & Root Dispersion
   packetBuffer[12]  = 49;
@@ -251,7 +251,7 @@ void adjustTimeZone(boolean setUp) {
 }
 
 void digitalClockDisplay() {
-  String d2 = String(hour()) + ":" + printDigits(minute()) + ":" + printDigits(second()) + " " +
+  String d2 = printDigits(hour()) + ":" + printDigits(minute()) + ":" + printDigits(second()) + " " +
               printDigits(day()) + "." + printDigits(month()) + "." +  String(year()).substring(2);
   Serial.println(d2);
   printOledFirstRow(d2);
@@ -268,15 +268,22 @@ boolean countTime() {
   if (timeToWait < 604800) {
     timeToWait = timeToWait + 1;
     return false;
-  } else  {
-    true;
   }
+  Serial.println("Time is adjusted....");
+  return true;
 }
 
 void printLed() {
-  String d2 = "b:" + String(blue) + " g:" + String(green) + " r:" + String(red) + " " + "t.a:" + String(getTimeZone());
+  String d2 = "b: " + String(blue) + " g: " + String(green) + " r: " + String(red);
   Serial.println(d2);
-  printOledSecondRow(d2);
+  printOledSecondRow(d2); 
+}
+
+void printTzAndTimeToSync(){
+  String d2 = "tz:" + String(getTimeZone()) + " st: D:" + String((604800 - timeToWait)/86400) +" M:" 
+  + String((604800 - timeToWait)/3600); 
+  Serial.println(d2);
+  printOledThirdRow(d2);
 }
 
 void checkLedsChannels() {
@@ -301,15 +308,23 @@ void printOledFirstRow(String text) {
   int str_len = text.length() + 1;
   char char_array[str_len];
   text.toCharArray(char_array, str_len);
-  u8g2.drawStr(0, 12, char_array);
+  u8g2.drawStr(0, 10, char_array);
 }
 
 void printOledSecondRow(String text) {
   int str_len = text.length() + 1;
   char char_array[str_len];
   text.toCharArray(char_array, str_len);
-  u8g2.drawStr(0, 24, char_array);
+  u8g2.drawStr(0, 20, char_array);
 }
+
+void printOledThirdRow(String text) {
+  int str_len = text.length() + 1;
+  char char_array[str_len];
+  text.toCharArray(char_array, str_len);
+  u8g2.drawStr(0, 30, char_array);
+}
+
 
 void setLedPinWithLevel() {
   leds = CRGB(red, green, blue);  
@@ -319,7 +334,7 @@ void setLedPinWithLevel() {
 void setup() {
   FastLED.addLeds<P9813, DATA_PIN_LED, CLOCK_PIN_LED, RGB>(leds, NUM_LEDS);
   u8g2.begin();
-  u8g2.setFont( u8g2_font_t0_12_tf);
+  u8g2.setFont( u8g2_font_6x10_tf);
   
   initLedOff();
   checkLedsChannels();
@@ -348,6 +363,7 @@ void loop() {
   do {
     digitalClockDisplay();
     printLed();
+    printTzAndTimeToSync();
   } while ( u8g2.nextPage() );
   Alarm.delay(1000);
   
