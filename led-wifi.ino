@@ -26,7 +26,7 @@ CRGBArray<NUM_LEDS> leds;
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
 
 char* ssid = "KS6";  //  your network SSID (name)
-char* pass = "*****";       // your network password
+char* pass = "Rom654321";       // your network password
 
 int bluePin = 14;
 int redPin = 12;
@@ -39,6 +39,8 @@ int alarms[] = {14, 21, 22, 23}; //array for values of time
 int red = 0;
 int green = 0;
 int blue = 0;
+
+int timeToSync = 259200; // in sec = 3 days
 
 int timeToWait = 0;
 unsigned int localPort = 2390;
@@ -274,14 +276,14 @@ boolean countTime() {
 }
 
 void printLed() {
-  String d2 = "b: " + String(blue) + " g: " + String(green) + " r: " + String(red);
+  String d2 = "b:" + String(blue) + " g:" + String(green) + " r:" + String(red);
   Serial.println(d2);
   printOledSecondRow(d2); 
 }
 
 void printTzAndTimeToSync(){
-  String d2 = "tz:" + String(getTimeZone()) + " st: D:" + String((604800 - timeToWait)/86400) +" M:" 
-  + String((604800 - timeToWait)/3600); 
+  String d2 = "tz:" + String(getTimeZone()) + " st: D:" + String((timeToSync - timeToWait)/86400) +" H:" 
+  + String((timeToSync - timeToWait)/3600); 
   Serial.println(d2);
   printOledThirdRow(d2);
 }
@@ -346,7 +348,7 @@ void setup() {
     setSyncProvider(getTime);
   }
 
-  setSyncInterval(604800);
+  setSyncInterval(timeToSync);
   adjustTimeZone(true);
   setCorrectTime();
 
@@ -359,6 +361,7 @@ void setup() {
 
 void loop() {
   adjustTimeZone(false);
+  setLedPinWithLevel();
   u8g2.firstPage();
   do {
     digitalClockDisplay();
@@ -366,7 +369,6 @@ void loop() {
     printTzAndTimeToSync();
   } while ( u8g2.nextPage() );
   Alarm.delay(1000);
-  
 }
 
 
