@@ -26,7 +26,7 @@ CRGBArray<NUM_LEDS> leds;
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
 
 char* ssid = "KS6";  //  your network SSID (name)
-char* pass = "***";       // your network password
+char* pass = "Rom654321";       // your network password
 
 int bluePin = 14;
 int redPin = 12;
@@ -39,6 +39,8 @@ int alarms[] = {14, 21, 22, 23}; //array for values of time
 int red = 0;
 int green = 0;
 int blue = 0;
+
+int maxValue = 200;
 
 int timeToSync = 259200; // in sec = 3 days
 
@@ -153,9 +155,9 @@ time_t getTime() {
 }
 
 void setLedOn() {
-  red = 255;
-  blue = 255;
-  green = 255;
+  red = maxValue;
+  blue = maxValue;
+  green = maxValue;
   setLedPinWithLevel();
 }
 
@@ -174,19 +176,19 @@ void initLedOff() {
 }
 
 void setSunset() {
-  for (int i = 255; i >= 150; i-- ) {
+  for (int i = maxValue; i >= 150; i-- ) {
     red = i;
     setLedPinWithLevel();
     delay(100);
   }
 
-  for (int i = 255; i >= 100; i-- ) {
+  for (int i = maxValue; i >= 100; i-- ) {
     green = i;
     setLedPinWithLevel();
     delay(100);
   }
 
-  for (int i = 255; i >= 50; i-- ) {
+  for (int i = maxValue ; i >= 50; i-- ) {
     blue = i;
     setLedPinWithLevel();
     delay(100);
@@ -206,7 +208,6 @@ void setTwilight() {
     setLedPinWithLevel();
     delay(100);
   }
-
   red = 0;
   green = 0;
 }
@@ -267,11 +268,12 @@ String printDigits(int digits) {
 }
 
 boolean countTime() {
-  if (timeToWait < 604800) {
+  if (timeToWait < timeToSync) {
     timeToWait = timeToWait + 1;
     return false;
   }
   Serial.println("Time is adjusted....");
+  timeToWait = 0;
   return true;
 }
 
