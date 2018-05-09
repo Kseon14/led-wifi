@@ -25,8 +25,8 @@ CRGBArray<NUM_LEDS> leds;
 
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
 
-char* ssid = "KS6";  //  your network SSID (name)
-char* pass = "****";       // your network password
+char* ssid = "***";  //  your network SSID (name)
+char* pass = "***";       // your network password
 
 int bluePin = 14;
 int redPin = 12;
@@ -40,9 +40,15 @@ int red = 0;
 int green = 0;
 int blue = 0;
 
-int maxValue = 200;
+int maxValue = 170;
+int deltaValue = 50;
 
-int timeToSync = 259200; // in sec = 3 days
+int timeZone = 0;
+
+int timeToSync = 120; //86400; // in sec = 1 day
+int sundays[] = {0, 0, 0, 0, 0};
+
+int maxDay = 0;
 
 int timeToWait = 0;
 unsigned int localPort = 2390;
@@ -63,7 +69,7 @@ unsigned long sendNTPpacket(IPAddress& address) {
   // (see URL above for details on the packets)
   packetBuffer[0] = 0b11100011;   // LI, Version, Mode
   packetBuffer[1] = 0;     // Stratum, or type of clock
-  packetBuffer[2]= 6;     // Polling Interval
+  packetBuffer[2] = 6;    // Polling Interval
   packetBuffer[3] = 0xEC;  // Peer Clock Precision
   // 8 bytes of zero for Root Delay & Root Dispersion
   packetBuffer[12]  = 49;
@@ -79,16 +85,66 @@ unsigned long sendNTPpacket(IPAddress& address) {
 }
 
 int getTimeZone() {
-  if (month() == 10 && weekday() == 1 && (day() + 7) > 31 ) {
-    return 2;
-  }
-  if (month() == 3 && weekday() == 1 && (day() + 7) > 31 ) {
-    return 3;
-  }
-  if (month() <= 3 || month() >= 10 ) {
+  if (month() < 3 || month() > 10 ) {
     return 2;
   } else {
     return 3;
+  }
+
+  if (month() == 10) {
+    if (maxDay != 0) {
+      if (day() < maxDay) {
+        return 3;
+      } else {
+        return 2;
+      }
+    }
+    calculateSundays();
+    Serial.println(maxDay);
+    if (day() < maxDay) {
+      return 3;
+    } else {
+      return 2;
+    }
+  }
+  if (month() == 3) {
+    if (maxDay != 0) {
+      if (day() < maxDay) {
+        return 2;
+      } else {
+        return 3;
+      }
+    }
+    calculateSundays();
+    Serial.println(maxDay);
+    if (day() < maxDay) {
+      return 2;
+    } else {
+      return 3;
+    }
+  }
+}
+
+void calculateSundays() {
+  maxDay = 0;
+  long curTime = now();
+  long daysToMonthEnd = 31 - day();
+  int i = 0;
+  //if current day is Sunday add to array
+  if (weekday(curTime) == 1) {
+    sundays[i] = day(curTime);
+    i++;
+  }
+  for (int y = 0; y <= daysToMonthEnd; y ++) {
+    if (weekday(curTime + 86400) == 1) {
+      sundays[i] = day(curTime + 86400);
+      i++;
+    }
+  }
+  for (int y = 0; y < 5; y++) {
+    if (sundays[y] > maxDay) {
+      maxDay = sundays[y];
+    }
   }
 }
 
@@ -149,8 +205,6 @@ time_t getTime() {
     printText("Unix time=" + String(epoch));
     return epoch;
   }
-  // wait ten seconds before asking for the time again
-  //delay(5000);
   return 0;
 }
 
@@ -171,18 +225,18 @@ void printText(String text) {
 }
 
 void initLedOff() {
-  leds = CRGB::Black; 
+  leds = CRGB::Black;
   FastLED.show();
 }
 
 void setSunset() {
-  for (int i = maxValue; i >= 150; i-- ) {
+  for (int i = maxValue; i >= (maxValue - deltaValue); i-- ) {
     red = i;
     setLedPinWithLevel();
     delay(100);
   }
 
-  for (int i = maxValue; i >= 100; i-- ) {
+  for (int i = maxValue; i >= 80; i-- ) {
     green = i;
     setLedPinWithLevel();
     delay(100);
@@ -196,18 +250,24 @@ void setSunset() {
 }
 
 void setTwilight() {
-  for (int i = 50; i <= 150; i++ ) {
+  for (int i = 50; i <= (maxValue - deltaValue); i++ ) {
     blue = i;
     setLedPinWithLevel();
     delay(100);
   }
 
-  for (int i = 100; i >= 0; i-- ) {
-    red = i;
+  for (int i = 80; i >= 0; i-- ) {
     green = i;
     setLedPinWithLevel();
     delay(100);
   }
+
+  for (int i = (maxValue - deltaValue); i >= 0; i-- ) {
+    red = i;
+    setLedPinWithLevel();
+    delay(100);
+  }
+
   red = 0;
   green = 0;
 }
@@ -215,7 +275,7 @@ void setTwilight() {
 void setLedOff() {
   red = 0;
   green = 0;
-  for (int i = 150; i >= 0; i-- ) {
+  for (int i = (maxValue - deltaValue); i >= 0; i-- ) {
     blue = i;
     setLedPinWithLevel();
     delay(100);
@@ -223,7 +283,7 @@ void setLedOff() {
   blue = 0;
 }
 
-void setCorrectTime() {
+void setCurrentLedLights() {
   String t1;
   if (alarms[0] <= hour() && hour() < alarms[1]) {
     t1 = "setLedOn";
@@ -245,14 +305,6 @@ void setCorrectTime() {
   Serial.println(t1);
 }
 
-void adjustTimeZone(boolean setUp) {
-  if (setUp || countTime()) {
-    adjustTime(getTimeZone() * SECS_PER_HOUR);
-    Serial.print("Time is adjusted to ");
-    Serial.println(getTimeZone());
-  }
-}
-
 void digitalClockDisplay() {
   String d2 = printDigits(hour()) + ":" + printDigits(minute()) + ":" + printDigits(second()) + " " +
               printDigits(day()) + "." + printDigits(month()) + "." +  String(year()).substring(2);
@@ -260,48 +312,37 @@ void digitalClockDisplay() {
   printOledFirstRow(d2);
 }
 
-String printDigits(int digits) { 
+String printDigits(int digits) {
   if (digits < 10) {
     return String("0") + digits;
   }
   return String(digits);
 }
 
-boolean countTime() {
-  if (timeToWait < timeToSync) {
-    timeToWait = timeToWait + 1;
-    return false;
-  }
-  Serial.println("Time is adjusted....");
-  timeToWait = 0;
-  return true;
-}
-
 void printLed() {
   String d2 = "b:" + String(blue) + " g:" + String(green) + " r:" + String(red);
   Serial.println(d2);
-  printOledSecondRow(d2); 
+  printOledSecondRow(d2);
 }
 
-void printTzAndTimeToSync(){
-  String d2 = "tz:" + String(getTimeZone()) + " st: D:" + String((timeToSync - timeToWait)/86400) +" H:" 
-  + String((timeToSync - timeToWait)/3600); 
+void printTzAndTimeToSync() {
+  String d2 = "tz:" + String(timeZone) + " st: ttw:" + String(timeToWait);
   Serial.println(d2);
   printOledThirdRow(d2);
 }
 
 void checkLedsChannels() {
-  leds = CRGB(0, 0, 255);  
+  leds = CRGB(0, 0, 255);
   FastLED.show();
   printText("Checking blue...");
   Serial.println("Checking blue...");
   delay(1000);
-  leds = CRGB(255, 0, 0);  
+  leds = CRGB(255, 0, 0);
   FastLED.show();
   printText("Checking red...");
   Serial.println("Checking red...");
   delay(1000);
-  leds = CRGB(0, 255, 0);  
+  leds = CRGB(0, 255, 0);
   FastLED.show();
   printText("Checking green...");
   Serial.println("Checking green...");
@@ -329,30 +370,47 @@ void printOledThirdRow(String text) {
   u8g2.drawStr(0, 30, char_array);
 }
 
-
 void setLedPinWithLevel() {
-  leds = CRGB(red, green, blue);  
+  leds = CRGB(red, green, blue);
   FastLED.show();
+}
+
+boolean countTime() {
+  if (timeToWait == 0) {
+    Serial.println("Sync time....");
+    timeToWait = timeToSync;
+    return true;
+  }
+  timeToWait = timeToWait - 1;
+  return false;
+}
+
+void adjustTimeZone() {
+  if (countTime() && getTimeZone() != timeZone) {
+    adjustTime(getTimeZone() * SECS_PER_HOUR);
+    Serial.print("Time is adjusted to ");
+    Serial.println(getTimeZone());
+    timeZone = getTimeZone();
+  }
 }
 
 void setup() {
   FastLED.addLeds<P9813, DATA_PIN_LED, CLOCK_PIN_LED, RGB>(leds, NUM_LEDS);
   u8g2.begin();
   u8g2.setFont( u8g2_font_6x10_tf);
-  
+
   initLedOff();
   checkLedsChannels();
   initLedOff();
   setConnection();
-  
-  //delay(3000);
+
   while (timeStatus() != timeSet) {
     setSyncProvider(getTime);
   }
 
   setSyncInterval(timeToSync);
-  adjustTimeZone(true);
-  setCorrectTime();
+  adjustTimeZone();
+  setCurrentLedLights();
 
   //Create an alarm that will call a function every day at a particular time.
   Alarm.alarmRepeat(alarms[0], 00, 0, setLedOn);
@@ -362,9 +420,9 @@ void setup() {
 }
 
 void loop() {
-  adjustTimeZone(false);
   setLedPinWithLevel();
   u8g2.firstPage();
+  adjustTimeZone();
   do {
     digitalClockDisplay();
     printLed();
