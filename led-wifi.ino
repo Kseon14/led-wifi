@@ -45,7 +45,8 @@ int deltaValue = 50;
 
 int timeZone = 0;
 
-int timeToSync = 120; //86400; // in sec = 1 day
+int timeToSync = 60; // in sec = 1 day
+int timeToSyncWithNet = 3600;
 int sundays[] = {0, 0, 0, 0, 0};
 
 int maxDay = 0;
@@ -326,7 +327,7 @@ void printLed() {
 }
 
 void printTzAndTimeToSync() {
-  String d2 = "tz:" + String(timeZone) + " st: ttw:" + String(timeToWait);
+  String d2 = "tz:" + String(getTimeZone()) + " ts:" + String(timeStatus()) + " ttw:" + String(timeToWait);
   Serial.println(d2);
   printOledThirdRow(d2);
 }
@@ -339,7 +340,7 @@ void checkLedsChannels() {
   delay(1000);
   leds = CRGB(255, 0, 0);
   FastLED.show();
-  printText("Checking red...");
+  printText("Checking red..."); 
   Serial.println("Checking red...");
   delay(1000);
   leds = CRGB(0, 255, 0);
@@ -386,11 +387,10 @@ boolean countTime() {
 }
 
 void adjustTimeZone() {
-  if (countTime() && getTimeZone() != timeZone) {
+  if (timeStatus() == timeSet) {
     adjustTime(getTimeZone() * SECS_PER_HOUR);
     Serial.print("Time is adjusted to ");
     Serial.println(getTimeZone());
-    timeZone = getTimeZone();
   }
 }
 
@@ -408,7 +408,8 @@ void setup() {
     setSyncProvider(getTime);
   }
 
-  setSyncInterval(timeToSync);
+  setSyncInterval(timeToSyncWithNet);
+  delay(1000);
   adjustTimeZone();
   setCurrentLedLights();
 
