@@ -25,14 +25,14 @@ CRGBArray<NUM_LEDS> leds;
 
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
 
-char* ssid = "***";  //  your network SSID (name)
-char* pass = "***";       // your network password
+char* ssid = "KS6";  //  your network SSID (name)
+char* pass = "Rom654321";       // your network password
 
 int bluePin = 14;
 int redPin = 12;
 int greenPin = 15;
 
-int alarms[] = {14, 21, 22, 23}; //array for values of time
+int alarms[4] = {14, 21, 22, 22}; //array for values of time
 
 //if "white" (R=255, G=255, B=255) doesn't look white,
 //reduce the red, green, or blue max value.
@@ -43,15 +43,11 @@ int blue = 0;
 int maxValue = 170;
 int deltaValue = 50;
 
-int timeZone = 0;
-
-int timeToSync = 60; // in sec = 1 day
-int timeToSyncWithNet = 3600;
+int timeToSyncWithNet = 86400;
 int sundays[] = {0, 0, 0, 0, 0};
 
 int maxDay = 0;
 
-int timeToWait = 0;
 unsigned int localPort = 2390;
 IPAddress timeServerIP; // time.nist.gov NTP server ad dress
 const char* ntpServerName = "time.nist.gov";
@@ -86,14 +82,10 @@ unsigned long sendNTPpacket(IPAddress& address) {
 }
 
 int getTimeZone() {
-  if (month() < 3 || month() > 10 ) {
-    return 2;
-  } else {
-    return 3;
-  }
 
   if (month() == 10) {
     if (maxDay != 0) {
+      Serial.println("max day not 0");
       if (day() < maxDay) {
         return 3;
       } else {
@@ -117,12 +109,17 @@ int getTimeZone() {
       }
     }
     calculateSundays();
-    Serial.println(maxDay);
     if (day() < maxDay) {
       return 2;
     } else {
       return 3;
     }
+  }
+
+  if (month() < 3 || month() > 10 ) {
+    return 2;
+  } else {
+    return 3;
   }
 }
 
@@ -130,22 +127,41 @@ void calculateSundays() {
   maxDay = 0;
   long curTime = now();
   long daysToMonthEnd = 31 - day();
+  Serial.print("Days till the month end ");
+  Serial.println(daysToMonthEnd);
   int i = 0;
   //if current day is Sunday add to array
   if (weekday(curTime) == 1) {
     sundays[i] = day(curTime);
+    Serial.print("Current day is Sunday");
+    Serial.println(sundays[i]);
     i++;
   }
+  long tmpTime = curTime;
   for (int y = 0; y <= daysToMonthEnd; y ++) {
-    if (weekday(curTime + 86400) == 1) {
-      sundays[i] = day(curTime + 86400);
+    Serial.print("Iteration # ");
+    Serial.println(y);
+    if (weekday(tmpTime) == 1) {
+      sundays[i] = day(tmpTime);
+      Serial.println(sundays[i]);
       i++;
     }
+    tmpTime = tmpTime + 86400;
   }
   for (int y = 0; y < 5; y++) {
     if (sundays[y] > maxDay) {
       maxDay = sundays[y];
     }
+  }
+  if (maxDay == 0) {
+    Serial.println("Current day after last Sunday of month");
+    maxDay = -1;
+  }
+  Serial.println("Max month Sunday date");
+  Serial.println(maxDay);
+  for (int i = 0; i < (sizeof(sundays) / sizeof(int)); i++) {
+    Serial.print(sundays[i]);
+    Serial.print(",");
   }
 }
 
@@ -327,7 +343,7 @@ void printLed() {
 }
 
 void printTzAndTimeToSync() {
-  String d2 = "tz:" + String(getTimeZone()) + " ts:" + String(timeStatus()) + " ttw:" + String(timeToWait);
+  String d2 = "tz:" + String(getTimeZone()) + " ts:" + String(timeStatus());
   Serial.println(d2);
   printOledThirdRow(d2);
 }
@@ -340,7 +356,7 @@ void checkLedsChannels() {
   delay(1000);
   leds = CRGB(255, 0, 0);
   FastLED.show();
-  printText("Checking red..."); 
+  printText("Checking red...");
   Serial.println("Checking red...");
   delay(1000);
   leds = CRGB(0, 255, 0);
@@ -376,16 +392,6 @@ void setLedPinWithLevel() {
   FastLED.show();
 }
 
-boolean countTime() {
-  if (timeToWait == 0) {
-    Serial.println("Sync time....");
-    timeToWait = timeToSync;
-    return true;
-  }
-  timeToWait = timeToWait - 1;
-  return false;
-}
-
 void adjustTimeZone() {
   if (timeStatus() == timeSet) {
     adjustTime(getTimeZone() * SECS_PER_HOUR);
@@ -408,7 +414,7 @@ void setup() {
     setSyncProvider(getTime);
   }
 
-  setSyncInterval(timeToSyncWithNet);
+  setSyncInterval(7200);
   delay(1000);
   adjustTimeZone();
   setCurrentLedLights();
@@ -417,13 +423,14 @@ void setup() {
   Alarm.alarmRepeat(alarms[0], 00, 0, setLedOn);
   Alarm.alarmRepeat(alarms[1], 00, 0, setSunset);
   Alarm.alarmRepeat(alarms[2], 00, 0, setTwilight);
-  Alarm.alarmRepeat(alarms[3], 00, 0, setLedOff);
+  Alarm.alarmRepeat(alarms[3], 30, 0, setLedOff);
 }
 
 void loop() {
   setLedPinWithLevel();
   u8g2.firstPage();
   adjustTimeZone();
+  Serial.println();
   do {
     digitalClockDisplay();
     printLed();
