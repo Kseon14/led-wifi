@@ -27,8 +27,8 @@ CRGBArray<NUM_LEDS> leds;
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, 5, 4, /* reset=*/ 16);
 
 #ifndef STASSID
-#define STASSID "KS7"
-#define STAPSK  "Rom654321"
+#define STASSID ""
+#define STAPSK  ""
 #endif
 #include <TZ.h>
 #define MYTZ TZ_Europe_Kiev
