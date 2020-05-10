@@ -2,7 +2,6 @@
 #define FASTLED_ESP8266_NODEMCU_PIN_ORDER
 #define FASTLED_FORCE_SOFTWARE_SPI
 #include <stdio.h>
-#include <TimeLib.h>
 #include <TimeAlarms.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
@@ -23,16 +22,35 @@
 
 CRGBArray<NUM_LEDS> leds;
 
-U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
+//U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
+//U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, 5, 4, /* reset=*/ 16);
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, 5, 4, /* reset=*/ 16);
 
-char* ssid = "";  //  your network SSID (name)
-char* pass = "";       // your network password
+#ifndef STASSID
+#define STASSID "KS7"
+#define STAPSK  "Rom654321"
+#endif
+#include <TZ.h>
+#define MYTZ TZ_Europe_Kiev
+
+#include <coredecls.h>                  // settimeofday_cb()
+#include <Schedule.h>
+#include <PolledTimeout.h>
+#include <time.h>  // time() ctime()
+#include <sys/time.h>                   // struct timeval
+
+#include <sntp.h>                       // sntp_servermode_dhcp()
+
+static timeval tv;
+static time_t sntp_now;
+
+static esp8266::polledTimeout::periodicMs showTimeNow(86400000);
 
 int bluePin = 14;
 int redPin = 12;
 int greenPin = 15;
 
-int alarms[4] = {14, 21, 22, 22}; //array for values of time
+int alarms[4][4] = {{14, 21, 22, 22}, {00, 00, 00, 30}}; //array for values of time
 
 //if "white" (R=255, G=255, B=255) doesn't look white,
 //reduce the red, green, or blue max value.
@@ -43,127 +61,10 @@ int blue = 0;
 int maxValue = 120;
 int deltaValue = 50;
 
-int timeToSyncWithNet = 86400;
-int sundays[] = {0, 0, 0, 0, 0};
-
-int maxDay = 0;
-
-unsigned int localPort = 2390;
-IPAddress timeServerIP; // time.nist.gov NTP server ad dress
-const char* ntpServerName = "time.nist.gov";
-const int NTP_PACKET_SIZE = 48; // NTP time stamp is in the first 48 bytes of the message
-byte packetBuffer[ NTP_PACKET_SIZE]; //buffer to hold incoming and outgoing packets
+String serverIp;
 
 // A UDP instance to let us send and receive packets over UDP
 WiFiUDP udp;
-
-unsigned long sendNTPpacket(IPAddress& address) {
-  Serial.print("sending NTP packet to ");
-  Serial.println(address);
-  // set all bytes in the buffer to 0
-  memset(packetBuffer, 0, NTP_PACKET_SIZE);
-  // Initialize values needed to form NTP request
-  // (see URL above for details on the packets)
-  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
-  packetBuffer[1] = 0;     // Stratum, or type of clock
-  packetBuffer[2] = 6;    // Polling Interval
-  packetBuffer[3] = 0xEC;  // Peer Clock Precision
-  // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12]  = 49;
-  packetBuffer[13]  = 0x4E;
-  packetBuffer[14]  = 49;
-  packetBuffer[15]  = 52;
-
-  // all NTP fields have been given values, now
-  // you can send a packet requesting a timestamp:
-  udp.beginPacket(address, 123); //NTP requests are to port 123
-  udp.write(packetBuffer, NTP_PACKET_SIZE);
-  udp.endPacket();
-}
-
-int getTimeZone() {
-
-  if (month() == 10) {
-    if (maxDay != 0) {
-      Serial.println("max day not 0");
-      if (day() < maxDay) {
-        return 3;
-      } else {
-        return 2;
-      }
-    }
-    calculateSundays();
-    Serial.println(maxDay);
-    if (day() < maxDay) {
-      return 3;
-    } else {
-      return 2;
-    }
-  }
-  if (month() == 3) {
-    if (maxDay != 0) {
-      if (day() < maxDay) {
-        return 2;
-      } else {
-        return 3;
-      }
-    }
-    calculateSundays();
-    if (day() < maxDay) {
-      return 2;
-    } else {
-      return 3;
-    }
-  }
-
-  if (month() < 3 || month() > 10 ) {
-    return 2;
-  } else {
-    return 3;
-  }
-}
-
-void calculateSundays() {
-  maxDay = 0;
-  long curTime = now();
-  long daysToMonthEnd = 31 - day();
-  Serial.print("Days till the month end ");
-  Serial.println(daysToMonthEnd);
-  int i = 0;
-  //if current day is Sunday add to array
-  if (weekday(curTime) == 1) {
-    sundays[i] = day(curTime);
-    Serial.print("Current day is Sunday");
-    Serial.println(sundays[i]);
-    i++;
-  }
-  long tmpTime = curTime;
-  for (int y = 0; y <= daysToMonthEnd; y ++) {
-    Serial.print("Iteration # ");
-    Serial.println(y);
-    if (weekday(tmpTime) == 1) {
-      sundays[i] = day(tmpTime);
-      Serial.println(sundays[i]);
-      i++;
-    }
-    tmpTime = tmpTime + 86400;
-  }
-  for (int y = 0; y < 5; y++) {
-    if (sundays[y] > maxDay) {
-      maxDay = sundays[y];
-    }
-  }
-  if (maxDay == 0) {
-    Serial.println("Current day after last Sunday of month");
-    maxDay = -1;
-  }
-  Serial.println("Max month Sunday date");
-  Serial.println(maxDay);
-  for (int i = 0; i < (sizeof(sundays) / sizeof(int)); i++) {
-    Serial.print(sundays[i]);
-    Serial.print(",");
-  }
-}
 
 void setConnection() {
   Serial.begin(115200);
@@ -172,9 +73,11 @@ void setConnection() {
 
   // We start by connecting to a WiFi network
   Serial.print("Connecting to ");
-  Serial.println(ssid);
-  printText("Connecting to " + String(ssid));
-  WiFi.begin(ssid, pass);
+  Serial.println(STASSID);
+  printText("Connecting to " + String(STASSID));
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(STASSID, STAPSK);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -185,44 +88,6 @@ void setConnection() {
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-
-  Serial.println("Starting UDP");
-  udp.begin(localPort);
-  Serial.print("Local port: ");
-  Serial.println(udp.localPort());
-}
-
-time_t getTime() {
-  //get a random server from the pool
-  WiFi.hostByName(ntpServerName, timeServerIP);
-
-  sendNTPpacket(timeServerIP); // send an NTP packet to a time server
-  // wait to see if a reply is available
-  printText("sending NTP....");
-  delay(9000);
-  unsigned long epoch = 0;
-
-  int cb = udp.parsePacket();
-  if (!cb) {
-    Serial.println("no packet yet");
-    printText("no packet yet....");
-  } else {
-    // We've received a packet, read the data from it
-    udp.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
-    //the timestamp starts at byte 40 of the received packet and is four bytes,
-    // or two words, long. First, esxtract the two words:
-    unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
-    unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
-    unsigned long secsSince1900 = highWord << 16 | lowWord;
-    Serial.print("Unix time = ");
-    // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
-    const unsigned long seventyYears = 2208988800UL;
-    epoch = secsSince1900 - seventyYears;
-    Serial.println(epoch);
-    printText("Unix time=" + String(epoch));
-    return epoch;
-  }
-  return 0;
 }
 
 void setLedOn() {
@@ -302,18 +167,20 @@ void setLedOff() {
 
 void setCurrentLedLights() {
   String t1;
-  if (alarms[0] <= hour() && hour() < alarms[1]) {
+  if (alarms[0][0] <= hour() && hour() < alarms[0][1]) {
     t1 = "setLedOn";
     setLedOn();
   }
-  else if (alarms[1] <= hour() && hour() < alarms[2]) {
+  else if (alarms[0][1] <= hour() && hour() < alarms[0][2]) {
     t1 = "setSunset";
     setSunset();
   }
-  else if (alarms[2] <= hour() && hour() < alarms[3]) {
+  else if ((alarms[0][2] <= hour() && hour() < alarms[0][3]) || 
+              (alarms[0][3] == hour() && minute() < alarms[1][3])) {
     t1 = "setTwilight";
     setTwilight();
   }
+
   else {
     t1 = "setLedOff";
     setLedOff();
@@ -342,8 +209,8 @@ void printLed() {
   printOledSecondRow(d2);
 }
 
-void printTzAndTimeToSync() {
-  String d2 = "tz:" + String(getTimeZone()) + " ts:" + String(timeStatus());
+void prinTimeServerIp() {
+  String d2 = "ts:" + serverIp;
   Serial.println(d2);
   printOledThirdRow(d2);
 }
@@ -392,12 +259,47 @@ void setLedPinWithLevel() {
   FastLED.show();
 }
 
-void adjustTimeZone() {
-  if (timeStatus() == timeSet) {
-    adjustTime(getTimeZone() * SECS_PER_HOUR);
-    Serial.print("Time is adjusted to ");
-    Serial.println(getTimeZone());
+void showTime() {
+  gettimeofday(&tv, nullptr);
+  sntp_now = time(nullptr);
+
+#if LWIP_VERSION_MAJOR > 1
+  // LwIP v2 is able to list more details about the currently configured SNTP servers
+  for (int i = 0; i < SNTP_MAX_SERVERS; i++) {
+    IPAddress sntp = *sntp_getserver(i);
+    const char* name = sntp_getservername(i);
+    if (sntp.isSet()) {
+      Serial.printf("sntp%d:     ", i);
+      if (name) {
+        Serial.printf("%s (%s) ", name, sntp.toString().c_str());
+        serverIp = sntp.toString().c_str();
+      } else {
+        Serial.printf("%s ", sntp.toString().c_str());
+      }
+    }
   }
+#endif
+
+  Serial.println();
+  const tm* tm = localtime(&sntp_now);
+  Serial.println("wating for time...");
+  printText("wating for time...");
+  while(tm->tm_year == 70) {
+    delay(500);
+    Serial.println(".");
+  }
+  setTime(tm->tm_hour, tm->tm_min, tm->tm_sec, tm->tm_mday, tm->tm_mon+1, tm->tm_year+1900);
+ 
+   // human readable
+  Serial.print("ctime:     ");
+  Serial.print(ctime(&sntp_now));
+ 
+}
+
+void timeInit(){
+  settimeofday_cb(showTime);
+  configTime(MYTZ, "pool.ntp.org");
+  showTime();
 }
 
 void setup() {
@@ -409,32 +311,27 @@ void setup() {
   checkLedsChannels();
   initLedOff();
   setConnection();
-
-  while (timeStatus() != timeSet) {
-    setSyncProvider(getTime);
-  }
-
-  setSyncInterval(7200);
-  delay(1000);
-  adjustTimeZone();
+  timeInit();
   setCurrentLedLights();
 
   //Create an alarm that will call a function every day at a particular time.
-  Alarm.alarmRepeat(alarms[0], 00, 0, setLedOn);
-  Alarm.alarmRepeat(alarms[1], 00, 0, setSunset);
-  Alarm.alarmRepeat(alarms[2], 00, 0, setTwilight);
-  Alarm.alarmRepeat(alarms[3], 30, 0, setLedOff);
+  Alarm.alarmRepeat(alarms[0][0], alarms[1][0], 0, setLedOn);
+  Alarm.alarmRepeat(alarms[0][1], alarms[1][1], 0, setSunset);
+  Alarm.alarmRepeat(alarms[0][2], alarms[1][2], 0, setTwilight);
+  Alarm.alarmRepeat(alarms[0][3], alarms[1][3], 0, setLedOff);
 }
 
 void loop() {
   setLedPinWithLevel();
   u8g2.firstPage();
-  adjustTimeZone();
+  if (showTimeNow) {
+    showTime();
+  }
   Serial.println();
   do {
     digitalClockDisplay();
     printLed();
-    printTzAndTimeToSync();
+    prinTimeServerIp();
   } while ( u8g2.nextPage() );
   Alarm.delay(1000);
 }
