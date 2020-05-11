@@ -23,7 +23,6 @@
 CRGBArray<NUM_LEDS> leds;
 
 //U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, CLOCK_PIN, DATA_PIN, /* reset=*/ U8X8_PIN_NONE);
-//U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, 5, 4, /* reset=*/ 16);
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, 5, 4, /* reset=*/ 16);
 
 #ifndef STASSID
@@ -303,7 +302,7 @@ void timeInit(){
 }
 
 void setup() {
-  FastLED.addLeds<P9813, DATA_PIN_LED, CLOCK_PIN_LED, RGB>(leds, NUM_LEDS);
+  FastLED.addLeds<P9813, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
   u8g2.begin();
   u8g2.setFont( u8g2_font_6x10_tf);
 
